@@ -2,26 +2,17 @@ import SwiftUI
 
 struct IslandRootView: View {
     @ObservedObject var viewModel: IslandViewModel
+    @ObservedObject var todoStore: TodoStore
     @State private var isHovering = false
+    @State private var todoDraft = ""
+    @FocusState private var isComposerFocused: Bool
 
     var body: some View {
-        Button(action: viewModel.handlePrimaryAction) {
+        ZStack {
+            backgroundShape
             content
         }
-        .buttonStyle(.plain)
-        .frame(
-            width: viewModel.state.size.width,
-            height: viewModel.state.size.height
-        )
-        .background {
-            Capsule(style: .continuous)
-                .fill(.black.opacity(0.92))
-                .overlay {
-                    Capsule(style: .continuous)
-                        .strokeBorder(.white.opacity(0.08), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.28), radius: 24, y: 10)
-        }
+        .frame(width: viewModel.state.size.width, height: viewModel.state.size.height)
         .scaleEffect(isHovering && viewModel.state != .expanded ? 1.015 : 1)
         .onHover { hovering in
             isHovering = hovering
@@ -36,13 +27,27 @@ struct IslandRootView: View {
         .animation(.spring(response: 0.28, dampingFraction: 0.88), value: isHovering)
     }
 
+    private var backgroundShape: some View {
+        Capsule(style: .continuous)
+            .fill(.black.opacity(0.92))
+            .overlay {
+                Capsule(style: .continuous)
+                    .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.28), radius: 24, y: 10)
+    }
+
     @ViewBuilder
     private var content: some View {
         switch viewModel.state {
         case .idle:
             idleContent
+                .contentShape(Rectangle())
+                .onTapGesture(perform: viewModel.handlePrimaryAction)
         case .compact:
             compactContent
+                .contentShape(Rectangle())
+                .onTapGesture(perform: viewModel.handlePrimaryAction)
         case .expanded:
             expandedContent
         }
@@ -132,26 +137,39 @@ struct IslandRootView: View {
                 }
 
                 Spacer(minLength: 0)
+
+                Button(action: viewModel.handlePrimaryAction) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.76))
+                        .frame(width: 24, height: 24)
+                        .background(
+                            Circle()
+                                .fill(.white.opacity(0.08))
+                        )
+                }
+                .buttonStyle(.plain)
             }
 
             HStack(spacing: 10) {
                 actionChip(systemImage: "backward.fill", title: "Prev")
                 actionChip(systemImage: "pause.fill", title: "Pause")
                 actionChip(systemImage: "forward.fill", title: "Next")
-                actionChip(systemImage: "checklist", title: "Todo")
+                Button {
+                    isComposerFocused = true
+                } label: {
+                    actionChip(systemImage: "checklist", title: "Todo")
+                }
+                .buttonStyle(.plain)
             }
 
-            HStack(spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
                 featureCard(
                     title: "Media",
                     subtitle: "Playback controls plug in here",
                     systemImage: "waveform"
                 )
-                featureCard(
-                    title: "Quick Note",
-                    subtitle: "Global shortcut will open inline capture",
-                    systemImage: "text.badge.plus"
-                )
+                todoComposer
             }
         }
         .padding(16)
@@ -194,5 +212,81 @@ struct IslandRootView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(.white.opacity(0.06))
         )
+    }
+
+    private var todoComposer: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Quick Note")
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+
+            HStack(spacing: 8) {
+                TextField("Add a todo", text: $todoDraft)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(.white.opacity(0.08))
+                    )
+                    .focused($isComposerFocused)
+                    .onSubmit(addTodo)
+
+                Button("Save", action: addTodo)
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.black.opacity(0.85))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(.white.opacity(todoDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.2 : 0.92))
+                    )
+            }
+
+            if todoStore.recentItems.isEmpty {
+                Text("Recent todos will appear here.")
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.5))
+            } else {
+                ForEach(todoStore.recentItems) { item in
+                    Button {
+                        todoStore.toggle(item)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(item.isCompleted ? .green.opacity(0.95) : .white.opacity(0.65))
+
+                            Text(item.title)
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(item.isCompleted ? 0.45 : 0.88))
+                                .strikethrough(item.isCompleted, color: .white.opacity(0.35))
+
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.white.opacity(0.06))
+        )
+    }
+
+    private func addTodo() {
+        let trimmed = todoDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        todoStore.add(title: trimmed)
+        todoDraft = ""
+        isComposerFocused = false
+        viewModel.presentQuickCapturePreview()
     }
 }

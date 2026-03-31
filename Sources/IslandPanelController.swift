@@ -5,10 +5,12 @@ import SwiftUI
 @MainActor
 final class IslandPanelController {
     private let viewModel = IslandViewModel()
+    private let todoStore: TodoStore
     private let panel: IslandPanel
     private var cancellables: Set<AnyCancellable> = []
 
-    init() {
+    init(todoStore: TodoStore) {
+        self.todoStore = todoStore
         let initialFrame = CGRect(origin: .zero, size: IslandState.compact.size)
         panel = IslandPanel(
             contentRect: initialFrame,
@@ -37,7 +39,7 @@ final class IslandPanelController {
     }
 
     private func installContent() {
-        let rootView = IslandRootView(viewModel: viewModel)
+        let rootView = IslandRootView(viewModel: viewModel, todoStore: todoStore)
             .frame(
                 width: viewModel.state.size.width,
                 height: viewModel.state.size.height
