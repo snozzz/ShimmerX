@@ -143,7 +143,7 @@ final class IslandPanelController {
 
     private func islandTopY(for screen: NSScreen) -> CGFloat {
         let notchBottomY = notchBottomY(for: screen)
-        let overlap: CGFloat = 4
+        let overlap: CGFloat = 10
         return notchBottomY + overlap
     }
 

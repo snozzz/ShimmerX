@@ -10,6 +10,7 @@ final class IslandViewModel: ObservableObject {
 
     private var autoCollapseTask: Task<Void, Never>?
     private var idleTask: Task<Void, Never>?
+    private var isPointerHovering = false
 
     func handlePrimaryAction() {
         switch state {
@@ -21,6 +22,7 @@ final class IslandViewModel: ObservableObject {
     }
 
     func hoverChanged(_ isHovering: Bool) {
+        isPointerHovering = isHovering
         guard state != .expanded else { return }
 
         if isHovering {
@@ -51,16 +53,20 @@ final class IslandViewModel: ObservableObject {
     private func collapseToCompact() {
         autoCollapseTask?.cancel()
         transition(to: .compact, title: "Now Playing", subtitle: "Tap to expand")
-        scheduleIdleTransition()
+
+        if !isPointerHovering {
+            scheduleIdleTransition()
+        }
     }
 
     private func scheduleAutoCollapse() {
         autoCollapseTask?.cancel()
         autoCollapseTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(6))
+            try? await Task.sleep(for: .seconds(8))
             guard !Task.isCancelled else { return }
             await MainActor.run {
-                self?.collapseToCompact()
+                guard let self, !self.isPointerHovering else { return }
+                self.collapseToCompact()
             }
         }
     }
@@ -71,7 +77,8 @@ final class IslandViewModel: ObservableObject {
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
             await MainActor.run {
-                self?.transition(to: .idle, title: "ShimmerX", subtitle: "Hover to wake")
+                guard let self, self.state != .expanded, !self.isPointerHovering else { return }
+                self.transition(to: .idle, title: "ShimmerX", subtitle: "Hover to wake")
             }
         }
     }
