@@ -2,9 +2,10 @@ import SwiftUI
 
 struct IslandRootView: View {
     @ObservedObject var viewModel: IslandViewModel
+    @State private var isHovering = false
 
     var body: some View {
-        Button(action: viewModel.toggleExpanded) {
+        Button(action: viewModel.handlePrimaryAction) {
             content
         }
         .buttonStyle(.plain)
@@ -21,7 +22,18 @@ struct IslandRootView: View {
                 }
                 .shadow(color: .black.opacity(0.28), radius: 24, y: 10)
         }
+        .scaleEffect(isHovering && viewModel.state != .expanded ? 1.015 : 1)
+        .onHover { hovering in
+            isHovering = hovering
+            viewModel.hoverChanged(hovering)
+        }
+        .contextMenu {
+            Button("Preview Quick Capture") {
+                viewModel.presentQuickCapturePreview()
+            }
+        }
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: viewModel.state)
+        .animation(.spring(response: 0.28, dampingFraction: 0.88), value: isHovering)
     }
 
     @ViewBuilder
@@ -39,10 +51,17 @@ struct IslandRootView: View {
     private var idleContent: some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(Color.white.opacity(0.85))
-                .frame(width: 8, height: 8)
+                .fill(
+                    LinearGradient(
+                        colors: [.white.opacity(0.95), .white.opacity(0.55)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 9, height: 9)
+                .shadow(color: .white.opacity(0.35), radius: 6)
 
-            Text("ShimmerX")
+            Text(viewModel.title)
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.92))
         }
@@ -66,11 +85,11 @@ struct IslandRootView: View {
                 }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Now Playing")
+                Text(viewModel.title)
                     .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.58))
 
-                Text("Tap To Expand")
+                Text(viewModel.subtitle)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
             }
@@ -103,11 +122,11 @@ struct IslandRootView: View {
                     }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("ShimmerX Preview")
+                    Text(viewModel.title)
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white)
 
-                    Text("Media and quick actions will land here.")
+                    Text(viewModel.subtitle)
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.58))
                 }
@@ -120,6 +139,19 @@ struct IslandRootView: View {
                 actionChip(systemImage: "pause.fill", title: "Pause")
                 actionChip(systemImage: "forward.fill", title: "Next")
                 actionChip(systemImage: "checklist", title: "Todo")
+            }
+
+            HStack(spacing: 8) {
+                featureCard(
+                    title: "Media",
+                    subtitle: "Playback controls plug in here",
+                    systemImage: "waveform"
+                )
+                featureCard(
+                    title: "Quick Note",
+                    subtitle: "Global shortcut will open inline capture",
+                    systemImage: "text.badge.plus"
+                )
             }
         }
         .padding(16)
@@ -138,6 +170,29 @@ struct IslandRootView: View {
         .background(
             Capsule(style: .continuous)
                 .fill(.white.opacity(0.1))
+        )
+    }
+
+    private func featureCard(title: String, subtitle: String, systemImage: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.92))
+
+            Text(title)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+
+            Text(subtitle)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.55))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.white.opacity(0.06))
         )
     }
 }
