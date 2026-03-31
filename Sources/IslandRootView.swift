@@ -14,8 +14,8 @@ struct IslandRootView: View {
             content
         }
         .frame(width: viewModel.state.size.width, height: viewModel.state.size.height)
-        .contentShape(RoundedRectangle(cornerRadius: viewModel.state == .expanded ? 28 : viewModel.state.size.height / 2, style: .continuous))
-        .scaleEffect(isHovering && viewModel.state != .expanded ? 1.015 : 1)
+        .contentShape(RoundedRectangle(cornerRadius: viewModel.state == .open ? 28 : viewModel.state.size.height / 2, style: .continuous))
+        .scaleEffect(isHovering && viewModel.state != .open ? 1.015 : 1)
         .onHover { hovering in
             isHovering = hovering
             viewModel.hoverChanged(hovering)
@@ -30,10 +30,10 @@ struct IslandRootView: View {
     }
 
     private var backgroundShape: some View {
-        RoundedRectangle(cornerRadius: viewModel.state == .expanded ? 28 : viewModel.state.size.height / 2, style: .continuous)
+        RoundedRectangle(cornerRadius: viewModel.state == .open ? 28 : viewModel.state.size.height / 2, style: .continuous)
             .fill(.black.opacity(0.92))
             .overlay {
-                RoundedRectangle(cornerRadius: viewModel.state == .expanded ? 28 : viewModel.state.size.height / 2, style: .continuous)
+                RoundedRectangle(cornerRadius: viewModel.state == .open ? 28 : viewModel.state.size.height / 2, style: .continuous)
                     .strokeBorder(.white.opacity(0.08), lineWidth: 1)
             }
             .shadow(color: .black.opacity(0.28), radius: 24, y: 10)
@@ -42,35 +42,12 @@ struct IslandRootView: View {
     @ViewBuilder
     private var content: some View {
         switch viewModel.state {
-        case .idle:
-            idleContent
-                .contentShape(Rectangle())
-                .onTapGesture(perform: viewModel.handlePrimaryAction)
-        case .compact:
+        case .closed:
             compactContent
                 .contentShape(Rectangle())
                 .onTapGesture(perform: viewModel.handlePrimaryAction)
-        case .expanded:
+        case .open:
             expandedContent
-        }
-    }
-
-    private var idleContent: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [.white.opacity(0.95), .white.opacity(0.55)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 9, height: 9)
-                .shadow(color: .white.opacity(0.35), radius: 6)
-
-            Text(viewModel.title)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.92))
         }
     }
 

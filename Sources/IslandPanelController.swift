@@ -30,7 +30,7 @@ final class IslandPanelController {
         )
         hostingController.sizingOptions = []
 
-        let initialFrame = CGRect(origin: .zero, size: IslandState.compact.size)
+        let initialFrame = CGRect(origin: .zero, size: IslandState.closed.size)
         panel = IslandPanel(
             contentRect: initialFrame,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -85,9 +85,9 @@ final class IslandPanelController {
 
     private func syncFocus(for state: IslandState) {
         switch state {
-        case .expanded:
+        case .open:
             panel.makeKeyAndOrderFront(nil)
-        case .idle, .compact:
+        case .closed:
             panel.orderFrontRegardless()
         }
     }
@@ -143,7 +143,7 @@ final class IslandPanelController {
 
     private func islandTopY(for screen: NSScreen) -> CGFloat {
         let notchBottomY = notchBottomY(for: screen)
-        let overlap: CGFloat = 10
+        let overlap: CGFloat = 14
         return notchBottomY + overlap
     }
 

@@ -3,88 +3,69 @@ import Foundation
 
 @MainActor
 final class IslandViewModel: ObservableObject {
-    @Published private(set) var state: IslandState = .idle
-    @Published private(set) var title: String = "ShimmerX"
-    @Published private(set) var subtitle: String = "Hover to wake"
+    @Published private(set) var state: IslandState = .closed
+    @Published private(set) var title: String = "Now Playing"
+    @Published private(set) var subtitle: String = "Hover to expand"
     @Published private(set) var isShowingQuickCapturePreview = false
 
-    private var autoCollapseTask: Task<Void, Never>?
-    private var idleTask: Task<Void, Never>?
+    private var closeTask: Task<Void, Never>?
     private var isPointerHovering = false
 
     func handlePrimaryAction() {
         switch state {
-        case .expanded:
-            collapseToCompact()
-        case .idle, .compact:
-            expand()
+        case .open:
+            close()
+        case .closed:
+            open()
         }
     }
 
     func hoverChanged(_ isHovering: Bool) {
         isPointerHovering = isHovering
-        guard state != .expanded else { return }
 
         if isHovering {
-            cancelIdleTask()
-            transition(to: .compact, title: "Now Playing", subtitle: "Tap to expand")
+            cancelCloseTask()
+            open()
         } else {
-            scheduleIdleTransition()
+            scheduleClose()
         }
     }
 
     func presentQuickCapturePreview() {
-        guard state != .expanded else { return }
+        guard state != .open else { return }
         transition(
-            to: .compact,
+            to: .closed,
             title: "Quick Capture",
             subtitle: "Todo shortcut ready",
             isQuickCapturePreview: true
         )
-        scheduleIdleTransition(after: .milliseconds(2200))
+        scheduleClose(after: .milliseconds(2200))
     }
 
-    private func expand() {
-        cancelIdleTask()
-        transition(to: .expanded, title: "ShimmerX Preview", subtitle: "Media and quick actions")
-        scheduleAutoCollapse()
+    func open() {
+        cancelCloseTask()
+        transition(to: .open, title: "ShimmerX", subtitle: "Media and quick actions")
     }
 
-    private func collapseToCompact() {
-        autoCollapseTask?.cancel()
-        transition(to: .compact, title: "Now Playing", subtitle: "Tap to expand")
-
-        if !isPointerHovering {
-            scheduleIdleTransition()
-        }
+    func close() {
+        cancelCloseTask()
+        transition(to: .closed, title: "Now Playing", subtitle: "Hover to expand")
     }
 
-    private func scheduleAutoCollapse() {
-        autoCollapseTask?.cancel()
-        autoCollapseTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(8))
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                guard let self, !self.isPointerHovering else { return }
-                self.collapseToCompact()
-            }
-        }
-    }
-
-    private func scheduleIdleTransition(after delay: Duration = .seconds(1.6)) {
-        idleTask?.cancel()
-        idleTask = Task { [weak self] in
+    private func scheduleClose(after delay: Duration = .milliseconds(450)) {
+        closeTask?.cancel()
+        closeTask = Task { [weak self] in
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
             await MainActor.run {
-                guard let self, self.state != .expanded, !self.isPointerHovering else { return }
-                self.transition(to: .idle, title: "ShimmerX", subtitle: "Hover to wake")
+                guard let self, self.state == .open, !self.isPointerHovering else { return }
+                self.close()
             }
         }
     }
 
-    private func cancelIdleTask() {
-        idleTask?.cancel()
+    private func cancelCloseTask() {
+        closeTask?.cancel()
     }
 
     private func transition(to newState: IslandState, title: String, subtitle: String) {
