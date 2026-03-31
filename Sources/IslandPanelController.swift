@@ -2,6 +2,11 @@ import AppKit
 import Combine
 import SwiftUI
 
+private struct IslandLayoutAnchor {
+    let centerX: CGFloat
+    let topY: CGFloat
+}
+
 @MainActor
 final class IslandPanelController {
     private let viewModel = IslandViewModel()
@@ -10,6 +15,7 @@ final class IslandPanelController {
     private let panel: IslandPanel
     private let hostingController: NSHostingController<IslandRootView>
     private var cancellables: Set<AnyCancellable> = []
+    private var anchor: IslandLayoutAnchor?
 
     init(todoStore: TodoStore, musicController: MusicController) {
         self.todoStore = todoStore
@@ -22,6 +28,7 @@ final class IslandPanelController {
                 musicController: musicController
             )
         )
+        hostingController.sizingOptions = []
 
         let initialFrame = CGRect(origin: .zero, size: IslandState.compact.size)
         panel = IslandPanel(
@@ -34,6 +41,7 @@ final class IslandPanelController {
         configurePanel()
         installContent()
         bindState()
+        refreshAnchor()
         updateFrame(animated: false)
     }
 
@@ -66,6 +74,13 @@ final class IslandPanelController {
                 self?.syncFocus(for: state)
             }
             .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
+            .sink { [weak self] _ in
+                self?.refreshAnchor()
+                self?.updateFrame(animated: false)
+            }
+            .store(in: &cancellables)
     }
 
     private func syncFocus(for state: IslandState) {
@@ -78,22 +93,39 @@ final class IslandPanelController {
     }
 
     private func updateFrame(animated: Bool) {
-        guard let screen = currentScreen() else { return }
+        if anchor == nil {
+            refreshAnchor()
+        }
+        guard let anchor else { return }
 
         let targetSize = viewModel.state.size
         panel.setContentSize(targetSize)
-
-        let origin = CGPoint(
-            x: islandCenterX(for: screen) - targetSize.width / 2,
-            y: islandTopY(for: screen, islandHeight: targetSize.height)
+        hostingController.preferredContentSize = targetSize
+        let frame = CGRect(
+            x: anchor.centerX - targetSize.width / 2,
+            y: anchor.topY - targetSize.height,
+            width: targetSize.width,
+            height: targetSize.height
         )
-        let frame = CGRect(origin: origin, size: targetSize)
 
         if animated {
-            panel.animator().setFrame(frame, display: true)
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.28
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                panel.animator().setFrame(frame, display: true)
+            }
         } else {
             panel.setFrame(frame, display: true)
         }
+    }
+
+    private func refreshAnchor() {
+        guard let screen = currentScreen() else { return }
+
+        anchor = IslandLayoutAnchor(
+            centerX: islandCenterX(for: screen),
+            topY: islandTopY(for: screen)
+        )
     }
 
     private func currentScreen() -> NSScreen? {
@@ -115,10 +147,10 @@ final class IslandPanelController {
         return (leftArea.maxX + rightArea.minX) / 2
     }
 
-    private func islandTopY(for screen: NSScreen, islandHeight: CGFloat) -> CGFloat {
+    private func islandTopY(for screen: NSScreen) -> CGFloat {
         let safeFrame = safeFrame(for: screen)
         let gap: CGFloat = 6
-        return safeFrame.maxY - gap - islandHeight
+        return safeFrame.maxY - gap
     }
 
     private func safeFrame(for screen: NSScreen) -> CGRect {
