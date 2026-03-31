@@ -6,6 +6,7 @@ final class IslandViewModel: ObservableObject {
     @Published private(set) var state: IslandState = .idle
     @Published private(set) var title: String = "ShimmerX"
     @Published private(set) var subtitle: String = "Hover to wake"
+    @Published private(set) var isShowingQuickCapturePreview = false
 
     private var autoCollapseTask: Task<Void, Never>?
     private var idleTask: Task<Void, Never>?
@@ -32,7 +33,12 @@ final class IslandViewModel: ObservableObject {
 
     func presentQuickCapturePreview() {
         guard state != .expanded else { return }
-        transition(to: .compact, title: "Quick Capture", subtitle: "Todo shortcut ready")
+        transition(
+            to: .compact,
+            title: "Quick Capture",
+            subtitle: "Todo shortcut ready",
+            isQuickCapturePreview: true
+        )
         scheduleIdleTransition(after: .milliseconds(2200))
     }
 
@@ -74,8 +80,18 @@ final class IslandViewModel: ObservableObject {
     }
 
     private func transition(to newState: IslandState, title: String, subtitle: String) {
+        transition(to: newState, title: title, subtitle: subtitle, isQuickCapturePreview: false)
+    }
+
+    private func transition(
+        to newState: IslandState,
+        title: String,
+        subtitle: String,
+        isQuickCapturePreview: Bool
+    ) {
         state = newState
         self.title = title
         self.subtitle = subtitle
+        self.isShowingQuickCapturePreview = isQuickCapturePreview
     }
 }

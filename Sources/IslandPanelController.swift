@@ -6,11 +6,13 @@ import SwiftUI
 final class IslandPanelController {
     private let viewModel = IslandViewModel()
     private let todoStore: TodoStore
+    private let musicController: MusicController
     private let panel: IslandPanel
     private var cancellables: Set<AnyCancellable> = []
 
-    init(todoStore: TodoStore) {
+    init(todoStore: TodoStore, musicController: MusicController) {
         self.todoStore = todoStore
+        self.musicController = musicController
         let initialFrame = CGRect(origin: .zero, size: IslandState.compact.size)
         panel = IslandPanel(
             contentRect: initialFrame,
@@ -36,10 +38,17 @@ final class IslandPanelController {
         panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         panel.ignoresMouseEvents = false
+        panel.isMovable = false
+        panel.hidesOnDeactivate = false
+        panel.becomesKeyOnlyIfNeeded = true
     }
 
     private func installContent() {
-        let rootView = IslandRootView(viewModel: viewModel, todoStore: todoStore)
+        let rootView = IslandRootView(
+            viewModel: viewModel,
+            todoStore: todoStore,
+            musicController: musicController
+        )
             .frame(
                 width: viewModel.state.size.width,
                 height: viewModel.state.size.height
@@ -51,10 +60,20 @@ final class IslandPanelController {
     private func bindState() {
         viewModel.$state
             .removeDuplicates(by: { $0 == $1 })
-            .sink { [weak self] _ in
+            .sink { [weak self] state in
                 self?.updateFrame(animated: true)
+                self?.syncFocus(for: state)
             }
             .store(in: &cancellables)
+    }
+
+    private func syncFocus(for state: IslandState) {
+        switch state {
+        case .expanded:
+            panel.makeKeyAndOrderFront(nil)
+        case .idle, .compact:
+            panel.orderFrontRegardless()
+        }
     }
 
     private func updateFrame(animated: Bool) {

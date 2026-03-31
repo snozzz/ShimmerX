@@ -3,6 +3,7 @@ import SwiftUI
 struct IslandRootView: View {
     @ObservedObject var viewModel: IslandViewModel
     @ObservedObject var todoStore: TodoStore
+    @ObservedObject var musicController: MusicController
     @State private var isHovering = false
     @State private var todoDraft = ""
     @FocusState private var isComposerFocused: Bool
@@ -90,13 +91,14 @@ struct IslandRootView: View {
                 }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(viewModel.title)
+                Text(compactTitle)
                     .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.58))
 
-                Text(viewModel.subtitle)
+                Text(compactSubtitle)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
             }
 
             Spacer(minLength: 0)
@@ -127,13 +129,15 @@ struct IslandRootView: View {
                     }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(viewModel.title)
+                    Text(expandedTitle)
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white)
+                        .lineLimit(1)
 
-                    Text(viewModel.subtitle)
+                    Text(expandedSubtitle)
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.58))
+                        .lineLimit(2)
                 }
 
                 Spacer(minLength: 0)
@@ -152,9 +156,21 @@ struct IslandRootView: View {
             }
 
             HStack(spacing: 10) {
-                actionChip(systemImage: "backward.fill", title: "Prev")
-                actionChip(systemImage: "pause.fill", title: "Pause")
-                actionChip(systemImage: "forward.fill", title: "Next")
+                Button(action: musicController.previousTrack) {
+                    actionChip(systemImage: "backward.fill", title: "Prev")
+                }
+                .buttonStyle(.plain)
+
+                Button(action: musicController.playPause) {
+                    actionChip(systemImage: musicController.snapshot.state.actionSymbol, title: musicController.snapshot.state == .playing ? "Pause" : "Play")
+                }
+                .buttonStyle(.plain)
+
+                Button(action: musicController.nextTrack) {
+                    actionChip(systemImage: "forward.fill", title: "Next")
+                }
+                .buttonStyle(.plain)
+
                 Button {
                     isComposerFocused = true
                 } label: {
@@ -164,11 +180,7 @@ struct IslandRootView: View {
             }
 
             HStack(alignment: .top, spacing: 8) {
-                featureCard(
-                    title: "Media",
-                    subtitle: "Playback controls plug in here",
-                    systemImage: "waveform"
-                )
+                mediaCard
                 todoComposer
             }
         }
@@ -205,6 +217,50 @@ struct IslandRootView: View {
                 .font(.system(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.55))
                 .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.white.opacity(0.06))
+        )
+    }
+
+    private var mediaCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: musicController.snapshot.state == .playing ? "waveform" : "music.note")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.92))
+
+                Text(musicController.snapshot.state.label)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+
+                Spacer(minLength: 0)
+
+                Button("Refresh", action: musicController.refresh)
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+
+            Text(musicController.snapshot.title)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+
+            Text(musicController.snapshot.subtitle)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.55))
+                .lineLimit(2)
+
+            if !musicController.snapshot.album.isEmpty, musicController.snapshot.album != musicController.snapshot.subtitle {
+                Text(musicController.snapshot.album)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.38))
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
@@ -288,5 +344,37 @@ struct IslandRootView: View {
         todoDraft = ""
         isComposerFocused = false
         viewModel.presentQuickCapturePreview()
+    }
+
+    private var compactTitle: String {
+        if viewModel.isShowingQuickCapturePreview {
+            return viewModel.title
+        }
+
+        return musicController.snapshot.state == .unavailable ? viewModel.title : musicController.snapshot.state.label
+    }
+
+    private var compactSubtitle: String {
+        if viewModel.isShowingQuickCapturePreview {
+            return viewModel.subtitle
+        }
+
+        return musicController.snapshot.state == .unavailable ? viewModel.subtitle : musicController.snapshot.title
+    }
+
+    private var expandedTitle: String {
+        if viewModel.isShowingQuickCapturePreview {
+            return viewModel.title
+        }
+
+        return musicController.snapshot.title
+    }
+
+    private var expandedSubtitle: String {
+        if viewModel.isShowingQuickCapturePreview {
+            return viewModel.subtitle
+        }
+
+        return musicController.snapshot.subtitle
     }
 }
