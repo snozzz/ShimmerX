@@ -63,7 +63,7 @@ final class IslandPanelController {
     }
 
     private func installContent() {
-        panel.setContentSize(viewModel.state.size)
+        hostingController.view.frame = CGRect(origin: .zero, size: viewModel.state.size)
     }
 
     private func bindState() {
@@ -99,8 +99,8 @@ final class IslandPanelController {
         guard let anchor else { return }
 
         let targetSize = viewModel.state.size
-        panel.setContentSize(targetSize)
         hostingController.preferredContentSize = targetSize
+        hostingController.view.frame = CGRect(origin: .zero, size: targetSize)
         let frame = CGRect(
             x: anchor.centerX - targetSize.width / 2,
             y: anchor.topY - targetSize.height,
@@ -108,15 +108,8 @@ final class IslandPanelController {
             height: targetSize.height
         )
 
-        if animated {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.28
-                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                panel.animator().setFrame(frame, display: true)
-            }
-        } else {
-            panel.setFrame(frame, display: true)
-        }
+        panel.setFrame(frame, display: true, animate: animated)
+        logFrame(frame)
     }
 
     private func refreshAnchor() {
@@ -126,6 +119,7 @@ final class IslandPanelController {
             centerX: islandCenterX(for: screen),
             topY: islandTopY(for: screen)
         )
+        logScreen(screen)
     }
 
     private func currentScreen() -> NSScreen? {
@@ -148,9 +142,8 @@ final class IslandPanelController {
     }
 
     private func islandTopY(for screen: NSScreen) -> CGFloat {
-        let safeFrame = safeFrame(for: screen)
         let gap: CGFloat = 6
-        return safeFrame.maxY - gap
+        return screen.visibleFrame.maxY - gap
     }
 
     private func safeFrame(for screen: NSScreen) -> CGRect {
@@ -161,5 +154,20 @@ final class IslandPanelController {
             width: screen.frame.width - insets.left - insets.right,
             height: screen.frame.height - insets.top - insets.bottom
         )
+    }
+
+    private func logScreen(_ screen: NSScreen) {
+        let safeFrame = safeFrame(for: screen)
+        let leftArea = screen.auxiliaryTopLeftArea ?? .zero
+        let rightArea = screen.auxiliaryTopRightArea ?? .zero
+        NSLog(
+            """
+            [ShimmerX] screen frame=\(NSStringFromRect(screen.frame)) visible=\(NSStringFromRect(screen.visibleFrame)) safeInsets=(top:\(screen.safeAreaInsets.top), left:\(screen.safeAreaInsets.left), bottom:\(screen.safeAreaInsets.bottom), right:\(screen.safeAreaInsets.right)) safeFrame=\(NSStringFromRect(safeFrame)) auxLeft=\(NSStringFromRect(leftArea)) auxRight=\(NSStringFromRect(rightArea)) anchor=(x:\(anchor?.centerX ?? 0), top:\(anchor?.topY ?? 0))
+            """
+        )
+    }
+
+    private func logFrame(_ frame: CGRect) {
+        NSLog("[ShimmerX] state=\(viewModel.state) frame=\(NSStringFromRect(frame))")
     }
 }
