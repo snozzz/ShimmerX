@@ -43,6 +43,7 @@ final class IslandViewModel: ObservableObject {
     }
 
     private func expand() {
+        cancelIdleTask()
         transition(to: .expanded, title: "ShimmerX Preview", subtitle: "Media and quick actions")
         scheduleAutoCollapse()
     }

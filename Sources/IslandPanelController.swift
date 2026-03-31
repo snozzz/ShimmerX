@@ -142,8 +142,9 @@ final class IslandPanelController {
     }
 
     private func islandTopY(for screen: NSScreen) -> CGFloat {
-        let gap: CGFloat = 6
-        return screen.visibleFrame.maxY - gap
+        let notchBottomY = notchBottomY(for: screen)
+        let overlap: CGFloat = 4
+        return notchBottomY + overlap
     }
 
     private func safeFrame(for screen: NSScreen) -> CGRect {
@@ -156,13 +157,24 @@ final class IslandPanelController {
         )
     }
 
+    private func notchBottomY(for screen: NSScreen) -> CGFloat {
+        let leftArea = screen.auxiliaryTopLeftArea ?? .zero
+        let rightArea = screen.auxiliaryTopRightArea ?? .zero
+
+        if !leftArea.isEmpty, !rightArea.isEmpty {
+            return min(leftArea.minY, rightArea.minY)
+        }
+
+        return safeFrame(for: screen).maxY
+    }
+
     private func logScreen(_ screen: NSScreen) {
         let safeFrame = safeFrame(for: screen)
         let leftArea = screen.auxiliaryTopLeftArea ?? .zero
         let rightArea = screen.auxiliaryTopRightArea ?? .zero
         NSLog(
             """
-            [ShimmerX] screen frame=\(NSStringFromRect(screen.frame)) visible=\(NSStringFromRect(screen.visibleFrame)) safeInsets=(top:\(screen.safeAreaInsets.top), left:\(screen.safeAreaInsets.left), bottom:\(screen.safeAreaInsets.bottom), right:\(screen.safeAreaInsets.right)) safeFrame=\(NSStringFromRect(safeFrame)) auxLeft=\(NSStringFromRect(leftArea)) auxRight=\(NSStringFromRect(rightArea)) anchor=(x:\(anchor?.centerX ?? 0), top:\(anchor?.topY ?? 0))
+            [ShimmerX] screen frame=\(NSStringFromRect(screen.frame)) visible=\(NSStringFromRect(screen.visibleFrame)) safeInsets=(top:\(screen.safeAreaInsets.top), left:\(screen.safeAreaInsets.left), bottom:\(screen.safeAreaInsets.bottom), right:\(screen.safeAreaInsets.right)) safeFrame=\(NSStringFromRect(safeFrame)) auxLeft=\(NSStringFromRect(leftArea)) auxRight=\(NSStringFromRect(rightArea)) notchBottomY=\(notchBottomY(for: screen)) anchor=(x:\(anchor?.centerX ?? 0), top:\(anchor?.topY ?? 0))
             """
         )
     }
