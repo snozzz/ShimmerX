@@ -14,6 +14,7 @@ struct IslandRootView: View {
             content
         }
         .frame(width: viewModel.state.size.width, height: viewModel.state.size.height)
+        .contentShape(RoundedRectangle(cornerRadius: viewModel.state == .expanded ? 28 : viewModel.state.size.height / 2, style: .continuous))
         .scaleEffect(isHovering && viewModel.state != .expanded ? 1.015 : 1)
         .onHover { hovering in
             isHovering = hovering
@@ -29,10 +30,10 @@ struct IslandRootView: View {
     }
 
     private var backgroundShape: some View {
-        Capsule(style: .continuous)
+        RoundedRectangle(cornerRadius: viewModel.state == .expanded ? 28 : viewModel.state.size.height / 2, style: .continuous)
             .fill(.black.opacity(0.92))
             .overlay {
-                Capsule(style: .continuous)
+                RoundedRectangle(cornerRadius: viewModel.state == .expanded ? 28 : viewModel.state.size.height / 2, style: .continuous)
                     .strokeBorder(.white.opacity(0.08), lineWidth: 1)
             }
             .shadow(color: .black.opacity(0.28), radius: 24, y: 10)
@@ -185,6 +186,7 @@ struct IslandRootView: View {
             }
         }
         .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func actionChip(systemImage: String, title: String) -> some View {

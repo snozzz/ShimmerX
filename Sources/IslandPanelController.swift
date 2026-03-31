@@ -8,11 +8,21 @@ final class IslandPanelController {
     private let todoStore: TodoStore
     private let musicController: MusicController
     private let panel: IslandPanel
+    private let hostingController: NSHostingController<IslandRootView>
     private var cancellables: Set<AnyCancellable> = []
 
     init(todoStore: TodoStore, musicController: MusicController) {
         self.todoStore = todoStore
         self.musicController = musicController
+
+        hostingController = NSHostingController(
+            rootView: IslandRootView(
+                viewModel: viewModel,
+                todoStore: todoStore,
+                musicController: musicController
+            )
+        )
+
         let initialFrame = CGRect(origin: .zero, size: IslandState.compact.size)
         panel = IslandPanel(
             contentRect: initialFrame,
@@ -41,20 +51,11 @@ final class IslandPanelController {
         panel.isMovable = false
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = true
+        panel.contentViewController = hostingController
     }
 
     private func installContent() {
-        let rootView = IslandRootView(
-            viewModel: viewModel,
-            todoStore: todoStore,
-            musicController: musicController
-        )
-            .frame(
-                width: viewModel.state.size.width,
-                height: viewModel.state.size.height
-            )
-
-        panel.contentView = NSHostingView(rootView: rootView)
+        panel.setContentSize(viewModel.state.size)
     }
 
     private func bindState() {
@@ -77,12 +78,14 @@ final class IslandPanelController {
     }
 
     private func updateFrame(animated: Bool) {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        guard let screen = currentScreen() else { return }
 
         let targetSize = viewModel.state.size
+        panel.setContentSize(targetSize)
+
         let origin = CGPoint(
-            x: screen.frame.midX - targetSize.width / 2,
-            y: screen.frame.maxY - topInset(for: screen) - targetSize.height
+            x: islandCenterX(for: screen) - targetSize.width / 2,
+            y: islandTopY(for: screen, islandHeight: targetSize.height)
         )
         let frame = CGRect(origin: origin, size: targetSize)
 
@@ -93,10 +96,38 @@ final class IslandPanelController {
         }
     }
 
-    private func topInset(for screen: NSScreen) -> CGFloat {
-        let visibleHeight = screen.visibleFrame.height
-        let fullHeight = screen.frame.height
-        let menuBarHeight = fullHeight - visibleHeight
-        return max(menuBarHeight + 8, 24)
+    private func currentScreen() -> NSScreen? {
+        if let screen = panel.screen {
+            return screen
+        }
+
+        return NSScreen.main ?? NSScreen.screens.first
+    }
+
+    private func islandCenterX(for screen: NSScreen) -> CGFloat {
+        let leftArea = screen.auxiliaryTopLeftArea ?? .zero
+        let rightArea = screen.auxiliaryTopRightArea ?? .zero
+
+        guard !leftArea.isEmpty, !rightArea.isEmpty else {
+            return screen.frame.midX
+        }
+
+        return (leftArea.maxX + rightArea.minX) / 2
+    }
+
+    private func islandTopY(for screen: NSScreen, islandHeight: CGFloat) -> CGFloat {
+        let safeFrame = safeFrame(for: screen)
+        let gap: CGFloat = 6
+        return safeFrame.maxY - gap - islandHeight
+    }
+
+    private func safeFrame(for screen: NSScreen) -> CGRect {
+        let insets = screen.safeAreaInsets
+        return CGRect(
+            x: screen.frame.minX + insets.left,
+            y: screen.frame.minY + insets.bottom,
+            width: screen.frame.width - insets.left - insets.right,
+            height: screen.frame.height - insets.top - insets.bottom
+        )
     }
 }

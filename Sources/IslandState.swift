@@ -12,7 +12,7 @@ enum IslandState: CaseIterable {
         case .compact:
             return CGSize(width: 214, height: 46)
         case .expanded:
-            return CGSize(width: 364, height: 138)
+            return CGSize(width: 430, height: 198)
         }
     }
 }
