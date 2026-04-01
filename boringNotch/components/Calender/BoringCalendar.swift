@@ -9,6 +9,39 @@ import EventKit
 import SwiftUI
 import Defaults
 
+final class TodoManager: ObservableObject {
+    @Published var items: [TodoItem]
+
+    init(items: [TodoItem] = Defaults[.todoItems]) {
+        self.items = items
+    }
+
+    var pendingItems: [TodoItem] {
+        items.filter { !$0.isCompleted }
+    }
+
+    var completedItems: [TodoItem] {
+        items.filter(\.isCompleted)
+    }
+
+    func add(_ title: String) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        items.insert(TodoItem(title: trimmed), at: 0)
+        persist()
+    }
+
+    func toggle(_ item: TodoItem) {
+        guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
+        items[index].isCompleted.toggle()
+        persist()
+    }
+
+    private func persist() {
+        Defaults[.todoItems] = items
+    }
+}
+
 struct Config: Equatable {
 //    var count: Int = 10  // 3 days past + today + 7 days future
     var past: Int = 3
@@ -192,6 +225,238 @@ struct CalendarView: View {
         .onAppear {
             calendarManager.updateCurrentDate(Date.now)
         }
+    }
+}
+
+struct HomeOrganizerView: View {
+    @Default(.homeOrganizerSection) private var selectedSection
+    @EnvironmentObject var vm: BoringViewModel
+    @StateObject private var todoManager = TodoManager()
+    @State private var gestureConsumed = false
+    @State private var transitionDirection: PanDirection = .up
+
+    private let switchThreshold: CGFloat = 65
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            organizerHeader
+            ZStack {
+                if selectedSection == .calendar {
+                    CalendarView()
+                        .id(HomeOrganizerSection.calendar)
+                        .transition(.asymmetric(
+                            insertion: insertionTransition(edge: .bottom),
+                            removal: removalTransition(edge: .top)
+                        ))
+                } else {
+                    TodoBoardView(todoManager: todoManager)
+                        .id(HomeOrganizerSection.todo)
+                        .transition(.asymmetric(
+                            insertion: insertionTransition(edge: .top),
+                            removal: removalTransition(edge: .bottom)
+                        ))
+                }
+            }
+            .frame(width: 250, height: 192, alignment: .top)
+            .clipped()
+        }
+        .frame(width: 250, alignment: .leading)
+        .panGesture(direction: .up) { amount, phase in
+            handleSwipe(amount: amount, phase: phase, direction: .up)
+        }
+        .panGesture(direction: .down) { amount, phase in
+            handleSwipe(amount: amount, phase: phase, direction: .down)
+        }
+        .animation(.spring(response: 0.38, dampingFraction: 0.88), value: selectedSection)
+    }
+
+    private var organizerHeader: some View {
+        HStack(spacing: 10) {
+            Label(selectedSection == .calendar ? "Calendar" : "Reminders", systemImage: selectedSection == .calendar ? "calendar" : "checklist")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+
+            Text(selectedSection == .calendar ? "Swipe up for reminders" : "Swipe down for calendar")
+                .font(.caption2)
+                .foregroundStyle(.gray)
+
+            Spacer(minLength: 0)
+
+            OrganizerPageIndicator(selectedSection: selectedSection)
+        }
+    }
+
+    private func handleSwipe(amount: CGFloat, phase: NSEvent.Phase, direction: PanDirection) {
+        if phase == .ended || phase == .cancelled {
+            gestureConsumed = false
+            return
+        }
+
+        guard !gestureConsumed, amount >= switchThreshold else { return }
+
+        switch direction {
+        case .up where selectedSection == .calendar:
+            transitionDirection = .up
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) {
+                selectedSection = .todo
+            }
+            gestureConsumed = true
+        case .down where selectedSection == .todo:
+            transitionDirection = .down
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) {
+                selectedSection = .calendar
+            }
+            gestureConsumed = true
+        default:
+            break
+        }
+    }
+
+    private func insertionTransition(edge: Edge) -> AnyTransition {
+        let actualEdge: Edge = transitionDirection == .up ? edge : (edge == .top ? .bottom : .top)
+        return .move(edge: actualEdge).combined(with: .opacity)
+    }
+
+    private func removalTransition(edge: Edge) -> AnyTransition {
+        let actualEdge: Edge = transitionDirection == .up ? edge : (edge == .top ? .bottom : .top)
+        return .move(edge: actualEdge).combined(with: .opacity)
+    }
+}
+
+struct OrganizerPageIndicator: View {
+    let selectedSection: HomeOrganizerSection
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Capsule()
+                .fill(selectedSection == .calendar ? .white : .white.opacity(0.22))
+                .frame(width: selectedSection == .calendar ? 18 : 6, height: 6)
+            Capsule()
+                .fill(selectedSection == .todo ? Defaults[.accentColor] : .white.opacity(0.22))
+                .frame(width: selectedSection == .todo ? 18 : 6, height: 6)
+        }
+    }
+}
+
+struct TodoBoardView: View {
+    @ObservedObject var todoManager: TodoManager
+    @State private var draftTitle = ""
+    @FocusState private var isComposerFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Today")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("\(todoManager.pendingItems.count) pending")
+                        .font(.caption)
+                        .foregroundStyle(.gray)
+                }
+                Spacer(minLength: 0)
+                Text("\(todoManager.completedItems.count) done")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.gray)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.white.opacity(0.08), in: Capsule())
+            }
+
+            HStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(Defaults[.accentColor])
+                    .font(.system(size: 16))
+                TextField("Add a reminder", text: $draftTitle)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, weight: .medium))
+                    .focused($isComposerFocused)
+                    .onSubmit(addItem)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            if todoManager.items.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Nothing lined up")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    Text("Add a few tasks and swipe back to your calendar whenever you need it.")
+                        .font(.caption)
+                        .foregroundStyle(.gray)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.top, 8)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 8) {
+                        ForEach(todoManager.pendingItems.prefix(4)) { item in
+                            TodoRowView(item: item) {
+                                todoManager.toggle(item)
+                            }
+                        }
+
+                        if !todoManager.completedItems.isEmpty {
+                            Divider()
+                                .overlay(.white.opacity(0.08))
+                                .padding(.vertical, 2)
+
+                            ForEach(todoManager.completedItems.prefix(2)) { item in
+                                TodoRowView(item: item) {
+                                    todoManager.toggle(item)
+                                }
+                                .opacity(0.7)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+    }
+
+    private func addItem() {
+        let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
+            todoManager.add(trimmed)
+        }
+        draftTitle = ""
+        isComposerFocused = true
+    }
+}
+
+struct TodoRowView: View {
+    let item: TodoItem
+    let onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(item.isCompleted ? Defaults[.accentColor] : .gray)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(item.isCompleted ? .gray : .white)
+                        .strikethrough(item.isCompleted, color: .gray)
+                        .multilineTextAlignment(.leading)
+                    Text(item.createdAt.formatted(date: .omitted, time: .shortened))
+                        .font(.caption2)
+                        .foregroundStyle(.gray)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }
 
