@@ -9,6 +9,44 @@ import EventKit
 import SwiftUI
 import Defaults
 
+private enum CalendarPanelMode {
+    case calendar
+    case todo
+}
+
+final class TodoManager: ObservableObject {
+    @Published var items: [TodoItem]
+
+    init(items: [TodoItem] = Defaults[.todoItems]) {
+        self.items = items
+    }
+
+    var pendingItems: [TodoItem] {
+        items.filter { !$0.isCompleted }
+    }
+
+    var completedItems: [TodoItem] {
+        items.filter(\.isCompleted)
+    }
+
+    func add(_ title: String) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        items.insert(TodoItem(title: trimmed), at: 0)
+        persist()
+    }
+
+    func toggle(_ item: TodoItem) {
+        guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
+        items[index].isCompleted.toggle()
+        persist()
+    }
+
+    private func persist() {
+        Defaults[.todoItems] = items
+    }
+}
+
 struct Config: Equatable {
 //    var count: Int = 10  // 3 days past + today + 7 days future
     var past: Int = 3
@@ -153,9 +191,55 @@ struct WheelPicker: View {
 struct CalendarView: View {
     @EnvironmentObject var vm: BoringViewModel
     @StateObject private var calendarManager = CalendarManager()
+    @StateObject private var todoManager = TodoManager()
     @State private var selectedDate = Date()
+    @State private var panelMode: CalendarPanelMode = .calendar
+    @State private var gestureConsumed = false
+
+    private let switchThreshold: CGFloat = 65
 
     var body: some View {
+        ZStack {
+            if panelMode == .calendar {
+                calendarContent
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
+            } else {
+                TodoPanelView(todoManager: todoManager)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
+            }
+        }
+        .frame(width: 250, height: 250, alignment: .top)
+        .clipped()
+        .contentShape(Rectangle())
+        .panGesture(direction: .up) { amount, phase in
+            handleSwipe(amount: amount, phase: phase, direction: .up)
+        }
+        .panGesture(direction: .down) { amount, phase in
+            handleSwipe(amount: amount, phase: phase, direction: .down)
+        }
+        .animation(.spring(response: 0.38, dampingFraction: 0.88), value: panelMode)
+        .listRowBackground(Color.clear)
+        .onChange(of: selectedDate) { _, newDate in
+            calendarManager.updateCurrentDate(newDate)
+        }
+        .onChange(of: vm.notchState) { _, _ in
+            calendarManager.updateCurrentDate(Date.now)
+            if vm.notchState == .closed {
+                panelMode = .calendar
+            }
+        }
+        .onAppear {
+            calendarManager.updateCurrentDate(Date.now)
+        }
+    }
+
+    private var calendarContent: some View {
         VStack(spacing: 8) {
             HStack {
                 Text("\(selectedDate, format: .dateTime.month())")
@@ -181,17 +265,143 @@ struct CalendarView: View {
             } else {
                 EventListView(events: calendarManager.events)
             }
+            Spacer(minLength: 0)
         }
-        .listRowBackground(Color.clear)
-        .onChange(of: selectedDate) { _, newDate in
-            calendarManager.updateCurrentDate(newDate)
+    }
+
+    private func handleSwipe(amount: CGFloat, phase: NSEvent.Phase, direction: PanDirection) {
+        if phase == .ended || phase == .cancelled {
+            gestureConsumed = false
+            return
         }
-        .onChange(of: vm.notchState) { _, _ in
-            calendarManager.updateCurrentDate(Date.now)
+
+        guard !gestureConsumed, amount >= switchThreshold else { return }
+
+        switch direction {
+        case .up where panelMode == .calendar:
+            panelMode = .todo
+            gestureConsumed = true
+        case .down where panelMode == .todo:
+            panelMode = .calendar
+            gestureConsumed = true
+        default:
+            break
         }
-        .onAppear {
-            calendarManager.updateCurrentDate(Date.now)
+    }
+}
+
+struct TodoPanelView: View {
+    @ObservedObject var todoManager: TodoManager
+    @State private var draftTitle = ""
+    @FocusState private var isComposerFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Reminders")
+                    .font(.system(size: 18))
+                    .fontWeight(.semibold)
+                Spacer()
+                Text("Swipe down")
+                    .font(.caption2)
+                    .foregroundStyle(.gray)
+            }
+
+            HStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(Defaults[.accentColor])
+                    .font(.system(size: 16))
+                TextField("Add a reminder", text: $draftTitle)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, weight: .medium))
+                    .focused($isComposerFocused)
+                    .onSubmit(addItem)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            if todoManager.items.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("No reminders")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    Text("Add one here, then swipe back down to the calendar.")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.top, 6)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 8) {
+                        ForEach(todoManager.pendingItems) { item in
+                            TodoRowView(item: item) {
+                                todoManager.toggle(item)
+                            }
+                        }
+
+                        if !todoManager.completedItems.isEmpty {
+                            Divider()
+                                .overlay(.white.opacity(0.08))
+                                .padding(.vertical, 2)
+
+                            ForEach(todoManager.completedItems.prefix(3)) { item in
+                                TodoRowView(item: item) {
+                                    todoManager.toggle(item)
+                                }
+                                .opacity(0.7)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+
+            Spacer(minLength: 0)
         }
+    }
+
+    private func addItem() {
+        let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
+            todoManager.add(trimmed)
+        }
+        draftTitle = ""
+        isComposerFocused = true
+    }
+}
+
+struct TodoRowView: View {
+    let item: TodoItem
+    let onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(item.isCompleted ? Defaults[.accentColor] : .gray)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(item.isCompleted ? .gray : .white)
+                        .strikethrough(item.isCompleted, color: .gray)
+                        .multilineTextAlignment(.leading)
+                    Text(item.createdAt.formatted(date: .omitted, time: .shortened))
+                        .font(.caption2)
+                        .foregroundStyle(.gray)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }
 

@@ -25,6 +25,13 @@ struct CustomVisualizer: Codable, Hashable, Equatable, Defaults.Serializable {
     var speed: CGFloat = 1.0
 }
 
+struct TodoItem: Codable, Hashable, Identifiable, Defaults.Serializable {
+    var id: UUID = UUID()
+    var title: String
+    var isCompleted: Bool = false
+    var createdAt: Date = .now
+}
+
 enum CalendarSelectionState: Codable, Defaults.Serializable {
     case all
     case selected(Set<String>)
@@ -114,6 +121,7 @@ extension Defaults.Keys {
     
         // MARK: Calendar
     static let calendarSelectionState = Key<CalendarSelectionState>("calendarSelectionState", default: .all)
+    static let todoItems = Key<[TodoItem]>("todoItems", default: [])
     
         // MARK: Fullscreen Media Detection
     static let alwaysHideInFullscreen = Key<Bool>("alwaysHideInFullscreen", default: false)
