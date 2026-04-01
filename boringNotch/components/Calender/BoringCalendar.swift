@@ -197,6 +197,7 @@ struct CalendarView: View {
     @State private var gestureConsumed = false
 
     private let switchThreshold: CGFloat = 65
+    private let panelHeight: CGFloat = 148
 
     var body: some View {
         ZStack {
@@ -215,6 +216,7 @@ struct CalendarView: View {
             }
         }
         .frame(width: 250, alignment: .top)
+        .frame(height: panelHeight, alignment: .top)
         .clipped()
         .contentShape(Rectangle())
         .panGesture(direction: .up) { amount, phase in
@@ -223,7 +225,7 @@ struct CalendarView: View {
         .panGesture(direction: .down) { amount, phase in
             handleSwipe(amount: amount, phase: phase, direction: .down)
         }
-        .animation(.spring(response: 0.38, dampingFraction: 0.88), value: panelMode)
+        .animation(.smooth(duration: 0.22), value: panelMode)
         .listRowBackground(Color.clear)
         .onChange(of: selectedDate) { _, newDate in
             calendarManager.updateCurrentDate(newDate)
@@ -266,6 +268,7 @@ struct CalendarView: View {
                 EventListView(events: calendarManager.events)
             }
         }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private func handleSwipe(amount: CGFloat, phase: NSEvent.Phase, direction: PanDirection) {
@@ -317,8 +320,12 @@ struct TodoPanelView: View {
                     .onSubmit(addItem)
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.vertical, 8)
             .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .onTapGesture {
+                NSApp.activate(ignoringOtherApps: true)
+                isComposerFocused = true
+            }
 
             if todoManager.items.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
@@ -357,6 +364,7 @@ struct TodoPanelView: View {
                 }
             }
         }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private func addItem() {

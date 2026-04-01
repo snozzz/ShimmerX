@@ -41,10 +41,10 @@ class BoringNotchWindow: NSPanel {
     }
     
     override var canBecomeKey: Bool {
-        false
+        true
     }
     
     override var canBecomeMain: Bool {
-        false
+        true
     }
 }
