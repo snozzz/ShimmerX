@@ -22,9 +22,11 @@ Carthage/Build/
 # Swift Package Manager
 .swiftpm/
 .build/
+.source-packages/
 
 # Derived data
 DerivedData/
+.derived-data/
 
 # Build output
 build/
@@ -36,6 +38,7 @@ build/
 *.swo
 *.tmp
 *.log
+.cache/
 
 # Other
 *.DS_Store
@@ -52,4 +55,3 @@ build/
 *.ipa
 *.xcarchive
 *.dSYM
-

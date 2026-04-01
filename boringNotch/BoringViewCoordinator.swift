@@ -8,7 +8,6 @@
 import Combine
 import Defaults
 import SwiftUI
-import TheBoringWorkerNotifier
 
 enum SneakContentType {
     case brightness
@@ -88,8 +87,8 @@ class BoringViewCoordinator: ObservableObject {
     }
     
     func setupWorkersNotificationObservers() {
-        notifier.setupObserver(notification: notifier.micStatusNotification, handler: initialMicStatus)
-        notifier.setupObserver(notification: notifier.sneakPeakNotification, handler: sneakPeekEvent)
+        notifier.setupObserver(self, notification: notifier.micStatusNotification, handler: #selector(initialMicStatus))
+        notifier.setupObserver(self, notification: notifier.sneakPeakNotification, handler: #selector(sneakPeekEvent))
     }
     
     @objc func sneakPeekEvent(_ notification: Notification) {
