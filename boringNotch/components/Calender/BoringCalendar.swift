@@ -214,7 +214,7 @@ struct CalendarView: View {
                     ))
             }
         }
-        .frame(width: 250, height: 250, alignment: .top)
+        .frame(width: 250, alignment: .top)
         .clipped()
         .contentShape(Rectangle())
         .panGesture(direction: .up) { amount, phase in
@@ -265,7 +265,6 @@ struct CalendarView: View {
             } else {
                 EventListView(events: calendarManager.events)
             }
-            Spacer(minLength: 0)
         }
     }
 
@@ -335,7 +334,7 @@ struct TodoPanelView: View {
             } else {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 8) {
-                        ForEach(todoManager.pendingItems) { item in
+                        ForEach(todoManager.pendingItems.prefix(4)) { item in
                             TodoRowView(item: item) {
                                 todoManager.toggle(item)
                             }
@@ -346,7 +345,7 @@ struct TodoPanelView: View {
                                 .overlay(.white.opacity(0.08))
                                 .padding(.vertical, 2)
 
-                            ForEach(todoManager.completedItems.prefix(3)) { item in
+                            ForEach(todoManager.completedItems.prefix(2)) { item in
                                 TodoRowView(item: item) {
                                     todoManager.toggle(item)
                                 }
@@ -357,8 +356,6 @@ struct TodoPanelView: View {
                     .padding(.vertical, 2)
                 }
             }
-
-            Spacer(minLength: 0)
         }
     }
 
