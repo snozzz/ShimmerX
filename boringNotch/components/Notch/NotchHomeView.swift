@@ -198,17 +198,17 @@ struct NotchHomeView: View {
             MusicPlayerView(albumArtNamespace: albumArtNamespace)
 
             if Defaults[.showCalendar] {
-                HomeOrganizerView()
-                    .onContinuousHover { phase in
-                        if Defaults[.closeGestureEnabled] {
-                            switch phase {
-                            case .active:
-                                Defaults[.closeGestureEnabled] = false
-                            case .ended:
-                                Defaults[.closeGestureEnabled] = false
+                CalendarView()
+                .onContinuousHover { phase in
+                                if Defaults[.closeGestureEnabled] {
+                                    switch phase {
+                                        case .active:
+                                            Defaults[.closeGestureEnabled] = false
+                                        case .ended:
+                                            Defaults[.closeGestureEnabled] = false
+                                    }
+                                }
                             }
-                        }
-                    }
                     .environmentObject(vm)
             }
 
