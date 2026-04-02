@@ -298,6 +298,8 @@ struct TodoPanelView: View {
     @FocusState private var isComposerFocused: Bool
 
     var body: some View {
+        let pendingItems = Array(todoManager.pendingItems.prefix(6))
+
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Reminders")
@@ -309,61 +311,49 @@ struct TodoPanelView: View {
                     .foregroundStyle(.gray)
             }
 
-            if todoManager.items.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("No reminders")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                    Text("Add one here, then swipe back down to the calendar.")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.top, 6)
-            } else {
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 6) {
-                        ForEach(todoManager.pendingItems.prefix(6)) { item in
-                            TodoRowView(item: item) {
-                                todoManager.toggle(item)
-                            }
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 6) {
+                    if pendingItems.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("No reminders")
+                                .font(.headline)
+                                .foregroundStyle(.white)
+                            Text("Add one here, then swipe back down to the calendar.")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-
-                        if !todoManager.completedItems.isEmpty {
-                            Divider()
-                                .overlay(.white.opacity(0.08))
-                                .padding(.vertical, 2)
-
-                            ForEach(todoManager.completedItems.prefix(3)) { item in
-                                TodoRowView(item: item) {
-                                    todoManager.toggle(item)
-                                }
-                                .opacity(0.7)
+                        .padding(.top, 6)
+                    } else {
+                        ForEach(pendingItems) { item in
+                            TodoRowView(item: item) {
+                                complete(item)
                             }
+                            .transition(.opacity)
                         }
                     }
-                    .padding(.vertical, 2)
+
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(Defaults[.accentColor])
+                            .font(.system(size: 14, weight: .semibold))
+                        TextField("Add a reminder", text: $draftTitle)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 12, weight: .medium))
+                            .focused($isComposerFocused)
+                            .onSubmit(addItem)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .padding(.top, pendingItems.isEmpty ? 8 : 2)
+                    .onTapGesture {
+                        NSApp.activate(ignoringOtherApps: true)
+                        isComposerFocused = true
+                    }
                 }
-            }
-
-            Spacer(minLength: 0)
-
-            HStack(spacing: 8) {
-                Image(systemName: "plus.circle.fill")
-                    .foregroundStyle(Defaults[.accentColor])
-                    .font(.system(size: 14, weight: .semibold))
-                TextField("Add a reminder", text: $draftTitle)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12, weight: .medium))
-                    .focused($isComposerFocused)
-                    .onSubmit(addItem)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .onTapGesture {
-                NSApp.activate(ignoringOtherApps: true)
-                isComposerFocused = true
+                .padding(.vertical, 2)
+                .animation(.easeOut(duration: 0.18), value: todoManager.items)
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
@@ -378,6 +368,12 @@ struct TodoPanelView: View {
         draftTitle = ""
         isComposerFocused = true
     }
+
+    private func complete(_ item: TodoItem) {
+        withAnimation(.easeOut(duration: 0.18)) {
+            todoManager.toggle(item)
+        }
+    }
 }
 
 struct TodoRowView: View {
@@ -387,16 +383,15 @@ struct TodoRowView: View {
     var body: some View {
         Button(action: onToggle) {
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                Image(systemName: "circle")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(item.isCompleted ? Defaults[.accentColor] : .gray)
+                    .foregroundStyle(.gray)
                     .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(item.title)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(item.isCompleted ? .gray : .white)
-                        .strikethrough(item.isCompleted, color: .gray)
+                        .foregroundStyle(.white)
                         .multilineTextAlignment(.leading)
                         .lineLimit(2)
                     Text(item.createdAt.formatted(date: .omitted, time: .shortened))
