@@ -298,7 +298,7 @@ struct TodoPanelView: View {
     @FocusState private var isComposerFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Reminders")
                     .font(.system(size: 18))
@@ -307,24 +307,6 @@ struct TodoPanelView: View {
                 Text("Swipe down")
                     .font(.caption2)
                     .foregroundStyle(.gray)
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: "plus.circle.fill")
-                    .foregroundStyle(Defaults[.accentColor])
-                    .font(.system(size: 16))
-                TextField("Add a reminder", text: $draftTitle)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13, weight: .medium))
-                    .focused($isComposerFocused)
-                    .onSubmit(addItem)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .onTapGesture {
-                NSApp.activate(ignoringOtherApps: true)
-                isComposerFocused = true
             }
 
             if todoManager.items.isEmpty {
@@ -340,8 +322,8 @@ struct TodoPanelView: View {
                 .padding(.top, 6)
             } else {
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 8) {
-                        ForEach(todoManager.pendingItems.prefix(4)) { item in
+                    VStack(spacing: 6) {
+                        ForEach(todoManager.pendingItems.prefix(6)) { item in
                             TodoRowView(item: item) {
                                 todoManager.toggle(item)
                             }
@@ -352,7 +334,7 @@ struct TodoPanelView: View {
                                 .overlay(.white.opacity(0.08))
                                 .padding(.vertical, 2)
 
-                            ForEach(todoManager.completedItems.prefix(2)) { item in
+                            ForEach(todoManager.completedItems.prefix(3)) { item in
                                 TodoRowView(item: item) {
                                     todoManager.toggle(item)
                                 }
@@ -362,6 +344,26 @@ struct TodoPanelView: View {
                     }
                     .padding(.vertical, 2)
                 }
+            }
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(Defaults[.accentColor])
+                    .font(.system(size: 14, weight: .semibold))
+                TextField("Add a reminder", text: $draftTitle)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12, weight: .medium))
+                    .focused($isComposerFocused)
+                    .onSubmit(addItem)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .onTapGesture {
+                NSApp.activate(ignoringOtherApps: true)
+                isComposerFocused = true
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
@@ -384,27 +386,29 @@ struct TodoRowView: View {
 
     var body: some View {
         Button(action: onToggle) {
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: 8) {
                 Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(item.isCompleted ? Defaults[.accentColor] : .gray)
+                    .padding(.top, 1)
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(item.title)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(item.isCompleted ? .gray : .white)
                         .strikethrough(item.isCompleted, color: .gray)
                         .multilineTextAlignment(.leading)
+                        .lineLimit(2)
                     Text(item.createdAt.formatted(date: .omitted, time: .shortened))
-                        .font(.caption2)
+                        .font(.system(size: 9, weight: .medium))
                         .foregroundStyle(.gray)
                 }
 
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
     }
