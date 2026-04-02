@@ -193,7 +193,7 @@ struct CalendarView: View {
     @StateObject private var calendarManager = CalendarManager()
     @StateObject private var todoManager = TodoManager()
     @State private var selectedDate = Date()
-    @State private var panelMode: CalendarPanelMode = .calendar
+    @State private var panelMode: CalendarPanelMode = .todo
     @State private var gestureConsumed = false
 
     private let switchThreshold: CGFloat = 65
@@ -233,7 +233,7 @@ struct CalendarView: View {
         .onChange(of: vm.notchState) { _, _ in
             calendarManager.updateCurrentDate(Date.now)
             if vm.notchState == .closed {
-                panelMode = .calendar
+                panelMode = .todo
             }
         }
         .onAppear {
