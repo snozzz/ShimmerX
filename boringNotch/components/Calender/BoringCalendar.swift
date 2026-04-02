@@ -295,7 +295,12 @@ struct CalendarView: View {
 struct TodoPanelView: View {
     @ObservedObject var todoManager: TodoManager
     @State private var draftTitle = ""
+    @State private var pendingCompletionIDs: Set<UUID> = []
+    @State private var pendingCompletionTasks: [UUID: Task<Void, Never>] = [:]
     @FocusState private var isComposerFocused: Bool
+
+    private let completionFadeDuration = 0.42
+    private let completionRemovalDelay: UInt64 = 650_000_000
 
     var body: some View {
         let pendingItems = Array(todoManager.pendingItems.prefix(6))
@@ -326,8 +331,11 @@ struct TodoPanelView: View {
                         .padding(.top, 6)
                     } else {
                         ForEach(pendingItems) { item in
-                            TodoRowView(item: item) {
-                                complete(item)
+                            TodoRowView(
+                                item: item,
+                                isPendingCompletion: pendingCompletionIDs.contains(item.id)
+                            ) {
+                                toggleCompletion(for: item)
                             }
                             .transition(.opacity)
                         }
@@ -354,9 +362,11 @@ struct TodoPanelView: View {
                 }
                 .padding(.vertical, 2)
                 .animation(.easeOut(duration: 0.18), value: todoManager.items)
+                .animation(.easeInOut(duration: completionFadeDuration), value: pendingCompletionIDs)
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
+        .onDisappear(perform: cancelPendingCompletionTasks)
     }
 
     private func addItem() {
@@ -369,29 +379,74 @@ struct TodoPanelView: View {
         isComposerFocused = true
     }
 
-    private func complete(_ item: TodoItem) {
+    private func toggleCompletion(for item: TodoItem) {
+        if pendingCompletionIDs.contains(item.id) {
+            restorePendingCompletion(for: item)
+        } else {
+            stageCompletion(for: item)
+        }
+    }
+
+    private func stageCompletion(for item: TodoItem) {
+        pendingCompletionTasks[item.id]?.cancel()
+        withAnimation(.easeInOut(duration: completionFadeDuration)) {
+            pendingCompletionIDs.insert(item.id)
+        }
+
+        pendingCompletionTasks[item.id] = Task {
+            try? await Task.sleep(nanoseconds: completionRemovalDelay)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                finalizeCompletion(for: item)
+            }
+        }
+    }
+
+    private func restorePendingCompletion(for item: TodoItem) {
+        pendingCompletionTasks[item.id]?.cancel()
+        pendingCompletionTasks[item.id] = nil
+        withAnimation(.easeInOut(duration: completionFadeDuration)) {
+            pendingCompletionIDs.remove(item.id)
+        }
+    }
+
+    private func finalizeCompletion(for item: TodoItem) {
+        guard pendingCompletionIDs.contains(item.id) else {
+            pendingCompletionTasks[item.id] = nil
+            return
+        }
+
+        pendingCompletionTasks[item.id] = nil
         withAnimation(.easeOut(duration: 0.18)) {
+            pendingCompletionIDs.remove(item.id)
             todoManager.toggle(item)
         }
+    }
+
+    private func cancelPendingCompletionTasks() {
+        pendingCompletionTasks.values.forEach { $0.cancel() }
+        pendingCompletionTasks.removeAll()
+        pendingCompletionIDs.removeAll()
     }
 }
 
 struct TodoRowView: View {
     let item: TodoItem
+    let isPendingCompletion: Bool
     let onToggle: () -> Void
 
     var body: some View {
         Button(action: onToggle) {
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "circle")
+                Image(systemName: isPendingCompletion ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(isPendingCompletion ? Defaults[.accentColor] : .gray)
                     .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(item.title)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(isPendingCompletion ? .gray : .white)
                         .multilineTextAlignment(.leading)
                         .lineLimit(2)
                     Text(item.createdAt.formatted(date: .omitted, time: .shortened))
@@ -404,6 +459,8 @@ struct TodoRowView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .opacity(isPendingCompletion ? 0.34 : 1)
+            .scaleEffect(isPendingCompletion ? 0.985 : 1)
         }
         .buttonStyle(.plain)
     }
