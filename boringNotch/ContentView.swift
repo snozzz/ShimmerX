@@ -393,13 +393,16 @@ struct ContentView: View {
                         coordinator.currentView = .shelf
                         doOpen()
                     } else if !isTargeted {
-                        print("DROP EVENT", vm.dropEvent)
                         if vm.dropEvent {
-                            vm.dropEvent = false
+                            let destination = vm.consumeDropDestination()
+                            if destination == .airdrop {
+                                vm.close()
+                                coordinator.currentView = .home
+                            }
                             return
                         }
 
-                        vm.dropEvent = false
+                        vm.resetDropInteraction()
                         vm.close()
                     }
                 }

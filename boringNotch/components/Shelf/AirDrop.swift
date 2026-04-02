@@ -9,6 +9,7 @@ import Cocoa
 
 class AirDrop: NSObject, NSSharingServiceDelegate {
     let files: [URL]
+    var onFinish: (() -> Void)?
     
     init(files: [URL]) {
         self.files = files
@@ -36,5 +37,13 @@ class AirDrop: NSObject, NSSharingServiceDelegate {
         }
         service.delegate = self
         service.perform(withItems: files)
+    }
+
+    func sharingService(_ sharingService: NSSharingService, didShareItems items: [Any]) {
+        onFinish?()
+    }
+
+    func sharingService(_ sharingService: NSSharingService, didFailToShareItems items: [Any], error: any Error) {
+        onFinish?()
     }
 }

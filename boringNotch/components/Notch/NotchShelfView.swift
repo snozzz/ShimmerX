@@ -10,7 +10,7 @@ struct NotchShelfView: View {
             AirDropView()
             panel
                 .onDrop(of: [.data], isTargeted: $vm.dropZoneTargeting) { providers in
-                    vm.dropEvent = true
+                    vm.beginDrop(to: .tray)
                     DispatchQueue.global().async {
                         tvm.load(providers)
                     }
@@ -61,4 +61,3 @@ struct NotchShelfView: View {
         }
     }
 }
-

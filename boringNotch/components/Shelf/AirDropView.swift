@@ -13,12 +13,13 @@ struct AirDropView: View {
     
     @State var trigger: UUID = .init()
     @State var targeting = false
+    @State private var activeDrop: AirDrop?
     
     var body: some View {
         dropArea
             .onDrop(of: [.data], isTargeted: $vm.dropZoneTargeting) { providers in
                 trigger = .init()
-                vm.dropEvent = true
+                vm.beginDrop(to: .airdrop)
                 DispatchQueue.global().async { beginDrop(providers) }
                 return true
             }
@@ -51,8 +52,7 @@ struct AirDropView: View {
                 picker.canChooseFiles = true
                 picker.begin { response in
                     if response == .OK {
-                        let drop = AirDrop(files: picker.urls)
-                        drop.begin()
+                        startDrop(with: picker.urls, shouldResetDropInteraction: false)
                     }
                 }
             }
@@ -63,8 +63,23 @@ struct AirDropView: View {
         assert(!Thread.isMainThread)
         guard let urls = providers.interfaceConvert() else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            let drop = AirDrop(files: urls)
-            drop.begin()
+            startDrop(with: urls, shouldResetDropInteraction: true)
         }
+    }
+
+    func startDrop(with urls: [URL], shouldResetDropInteraction: Bool) {
+        let drop = AirDrop(files: urls)
+        drop.onFinish = {
+            DispatchQueue.main.async {
+                activeDrop = nil
+                if shouldResetDropInteraction {
+                    vm.resetDropInteraction()
+                }
+                vm.close()
+                vm.coordinator.currentView = .home
+            }
+        }
+        activeDrop = drop
+        drop.begin()
     }
 }

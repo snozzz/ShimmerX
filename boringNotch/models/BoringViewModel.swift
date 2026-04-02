@@ -14,6 +14,11 @@ enum BrowserType {
     case safari
 }
 
+enum DropDestination {
+    case tray
+    case airdrop
+}
+
 struct ExpandedItem {
     var show: Bool = false
     var type: SneakContentType = .battery
@@ -35,6 +40,7 @@ class BoringViewModel: NSObject, ObservableObject {
     @Published var dragDetectorTargeting: Bool = false
     @Published var dropZoneTargeting: Bool = false
     @Published var dropEvent: Bool = false
+    @Published var dropDestination: DropDestination?
     @Published var anyDropZoneTargeting: Bool = false
     var cancellables: Set<AnyCancellable> = []
 
@@ -151,6 +157,25 @@ class BoringViewModel: NSObject, ObservableObject {
 
     func toggleClipboard() {
         openClipboard()
+    }
+
+    func beginDrop(to destination: DropDestination) {
+        dropDestination = destination
+        dropEvent = true
+    }
+
+    @discardableResult
+    func consumeDropDestination() -> DropDestination? {
+        let destination = dropDestination
+        resetDropInteraction()
+        return destination
+    }
+
+    func resetDropInteraction() {
+        dropZoneTargeting = false
+        dragDetectorTargeting = false
+        dropEvent = false
+        dropDestination = nil
     }
 
     func closeHello() {
